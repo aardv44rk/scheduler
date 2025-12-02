@@ -108,19 +108,15 @@ impl<'a> TaskRepository<'a> {
     }
 
     pub async fn get_next_pending_task(&self) -> sqlx::Result<Option<Task>> {
-        let now = Utc::now();
-
         let row = sqlx::query(
             r#"
             SELECT id, name, task_type, trigger_at, interval_seconds, payload, deleted_at
             FROM tasks
-            WHERE trigger_at <= ?
-            AND deleted_at IS NULL
+            WHERE deleted_at IS NULL
             ORDER BY trigger_at ASC
             LIMIT 1
             "#,
         )
-        .bind(now)
         .fetch_optional(self.pool)
         .await?;
 

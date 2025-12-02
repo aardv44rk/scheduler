@@ -108,9 +108,8 @@ impl TaskService {
                     TaskRepository::delete_task_with_executor(&mut *scheduler_tx, task.id).await?;
                 }
                 TaskType::Interval => {
-                    // extract to helper function
                     if let Some(seconds) = task.interval_seconds {
-                        let next_trigger = task.trigger_at + chrono::Duration::seconds(seconds);
+                        let next_trigger = chrono::Utc::now() + chrono::Duration::seconds(seconds);
 
                         TaskRepository::update_trigger_with_executor(
                             &mut *scheduler_tx,
