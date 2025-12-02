@@ -11,12 +11,22 @@ use task_scheduler::{api, config::Config, service::TaskService};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
 
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::EnvFilter::new(&config.rust_log))
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    let app_env = std::env::var("APP_ENV").unwrap_or_else(|_| "development".into());
+    let filter = tracing_subscriber::EnvFilter::new(&config.rust_log);
 
-    tracing::info!("Starting Task Scheduler...");
+    if app_env.eq_ignore_ascii_case("production") {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_subscriber::fmt::layer().json())
+            .init();
+    } else {
+        tracing_subscriber::registry()
+            .with(filter)
+            .with(tracing_subscriber::fmt::layer().pretty())
+            .init();
+    }
+
+    tracing::info!("Starting Task Scheduler in {} mode", app_env);
 
     let connection_options = SqliteConnectOptions::from_str(&config.db_url)?
         .create_if_missing(true)

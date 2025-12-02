@@ -14,9 +14,9 @@ thiserror = "2.0.17"
 dotenvy = "0.15.7"
 anyhow = "1.0.100"
 tracing = "0.1.43"
-tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.22", features = ["env-filter", "json"] }
 axum = "0.8.7"
-tower-http = { version = "0.6.7", features = ["trace"] }
+tower-http = { version = "0.6.7", features = ["request-id", "trace"] }
 tokio-util = { version = "0.7.17", features = ["full"] }
 tower = { version = "0.5.2", features = ["full"] }
 mime = "0.3.17"

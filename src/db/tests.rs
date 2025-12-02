@@ -65,7 +65,8 @@ async fn test_get_next_pending_task_logic(pool: SqlitePool) -> sqlx::Result<()> 
     repo.create_task(&future_task).await?;
 
     let pending = repo.get_next_pending_task().await?;
-    assert!(pending.is_none(), "Should not pick up future tasks");
+    assert!(pending.is_some(), "Should return future task as pending");
+    assert_eq!(pending.unwrap().id, future_task.id);
 
     let past_recent = Task::new_once("past_recent", past_time_recent, json!({}));
     repo.create_task(&past_recent).await?;

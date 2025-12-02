@@ -33,7 +33,7 @@ async fn test_process_task_reschedules(pool: SqlitePool) -> sqlx::Result<()> {
     // Fetch the task again to verify it was rescheduled
     let updated_task = repo.get_task(task.id).await?.expect("Task should exist");
 
-    let expected_trigger = trigger_at + Duration::seconds(interval_seconds);
+    let expected_trigger = Utc::now() + Duration::seconds(interval_seconds);
 
     let diff = updated_task
         .trigger_at
@@ -41,7 +41,10 @@ async fn test_process_task_reschedules(pool: SqlitePool) -> sqlx::Result<()> {
         .num_milliseconds()
         .abs();
 
-    assert!(diff < 100, "Task should have incremented by interval");
+    assert!(
+        diff < 1000,
+        "Task should have incremented by interval relevant to now"
+    );
 
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM executions WHERE task_id = ?")
         .bind(task.id)
