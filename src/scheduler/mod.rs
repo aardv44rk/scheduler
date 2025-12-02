@@ -62,5 +62,5 @@ pub async fn run_scheduler(
             }
         }
     }
-    tracing::info!("Scheduler exited cleanly!")
+    tracing::info!("Scheduler exited cleanly!");
 }
