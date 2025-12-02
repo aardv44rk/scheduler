@@ -32,7 +32,7 @@ impl MakeRequestId for MakeUuidRequest {
         let uuid = Uuid::new_v4().to_string();
 
         let header_value =
-            HeaderValue::from_str(&uuid).unwrap_or(HeaderValue::from_static("invalid-uuid"));
+            HeaderValue::from_str(&uuid).expect("UUID string should always be a valid HeaderValue");
 
         Some(RequestId::new(header_value))
     }
