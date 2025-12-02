@@ -50,6 +50,7 @@ pub struct Task {
     pub trigger_at: DateTime<Utc>,
     pub interval_seconds: Option<i64>,
     pub payload: Value,
+    pub deleted_at: Option<DateTime<Utc>>,
 }
 
 impl Task {
@@ -61,6 +62,7 @@ impl Task {
             trigger_at,
             interval_seconds: None,
             payload,
+            deleted_at: None,
         }
     }
 
@@ -77,6 +79,7 @@ impl Task {
             trigger_at,
             interval_seconds: Some(interval_seconds),
             payload,
+            deleted_at: None,
         }
     }
 }

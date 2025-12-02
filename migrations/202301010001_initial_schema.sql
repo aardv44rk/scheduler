@@ -5,7 +5,8 @@ CREATE TABLE tasks (
     trigger_at DATETIME NOT NULL,
     interval_seconds INTEGER,
     payload TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    deleted_at DATETIME
 );
 
 CREATE INDEX idx_tasks_trigger_at ON tasks(trigger_at);

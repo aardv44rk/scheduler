@@ -6,6 +6,8 @@ use crate::service::TaskService;
 use axum::{Json, Router, extract::State, routing::post};
 use serde_json::{Value, json};
 
+#[cfg(test)]
+mod tests;
 #[derive(Clone)]
 pub struct AppState {
     pub service: TaskService,

@@ -35,7 +35,7 @@ impl<'a> TaskRepository<'a> {
     pub async fn get_task(&self, id: Uuid) -> sqlx::Result<Option<Task>> {
         let row = sqlx::query(
             r#"
-            SELECT id, name, task_type, trigger_at, interval_seconds, payload
+            SELECT id, name, task_type, trigger_at, interval_seconds, payload, deleted_at
             FROM tasks
             WHERE id = ?
             "#,
@@ -55,6 +55,7 @@ impl<'a> TaskRepository<'a> {
             trigger_at: row.try_get("trigger_at")?,
             interval_seconds: row.try_get("interval_seconds")?,
             payload: row.try_get::<Json<Value>, _>("payload")?.0,
+            deleted_at: row.try_get("deleted_at")?,
         }))
     }
 
@@ -66,7 +67,8 @@ impl<'a> TaskRepository<'a> {
     where
         E: Executor<'c, Database = Sqlite>,
     {
-        let result = sqlx::query("DELETE FROM tasks WHERE id = ?")
+        let result = sqlx::query("UPDATE tasks SET deleted_at = ? WHERE id = ?")
+            .bind(Utc::now())
             .bind(id)
             .execute(executor)
             .await?;
@@ -110,9 +112,10 @@ impl<'a> TaskRepository<'a> {
 
         let row = sqlx::query(
             r#"
-            SELECT id, name, task_type, trigger_at, interval_seconds, payload
+            SELECT id, name, task_type, trigger_at, interval_seconds, payload, deleted_at
             FROM tasks
             WHERE trigger_at <= ?
+            AND deleted_at IS NULL
             ORDER BY trigger_at ASC
             LIMIT 1
             "#,
@@ -133,6 +136,7 @@ impl<'a> TaskRepository<'a> {
             trigger_at: row.try_get("trigger_at")?,
             interval_seconds: row.try_get("interval_seconds")?,
             payload: row.try_get::<Json<Value>, _>("payload")?.0,
+            deleted_at: row.try_get("deleted_at")?,
         }))
     }
 }

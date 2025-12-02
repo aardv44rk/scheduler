@@ -7,6 +7,9 @@ use sqlx::{SqlitePool, types::Json};
 use tokio::sync::mpsc::Sender;
 use uuid::Uuid;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Clone)]
 pub struct TaskService {
     db_pool: SqlitePool,
