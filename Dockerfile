@@ -49,7 +49,7 @@ USER appuser
 
 #   set environment variables
 ENV DATABASE_URL=sqlite:///app/data/tasks.db
-ENV PORT=8080
+ENV SERVER_PORT=8080
 ENV APP_ENV=production
 
 EXPOSE 8080
