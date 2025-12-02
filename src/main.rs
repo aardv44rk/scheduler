@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let app_env = std::env::var("APP_ENV").unwrap_or_else(|_| "development".into());
     let filter = tracing_subscriber::EnvFilter::new(&config.rust_log);
 
-    if app_env == "production" {
+    if app_env.eq_ignore_ascii_case("production") {
         tracing_subscriber::registry()
             .with(filter)
             .with(tracing_subscriber::fmt::layer().json())
