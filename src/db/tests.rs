@@ -38,7 +38,16 @@ async fn test_create_and_get_task(pool: SqlitePool) -> sqlx::Result<()> {
     assert_eq!(deleted_count, 1);
 
     let deleted_task = repo.get_task(new_task.id).await?;
-    assert!(deleted_task.is_none());
+    assert!(
+        deleted_task.is_some(),
+        "Soft deleted task should still be retrievable"
+    );
+
+    let deleted_task = deleted_task.unwrap();
+    assert!(
+        deleted_task.deleted_at.is_some(),
+        "Deleted task should have deleted_at set"
+    );
 
     Ok(())
 }

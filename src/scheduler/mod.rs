@@ -3,8 +3,13 @@ use std::time::Duration;
 use crate::{db::queries::TaskRepository, service::TaskService};
 use chrono::Utc;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
-pub async fn run_scheduler(service: TaskService, mut rx: mpsc::Receiver<()>) {
+pub async fn run_scheduler(
+    service: TaskService,
+    mut rx: mpsc::Receiver<()>,
+    token: CancellationToken,
+) {
     let repo = TaskRepository::new(&service.get_pool());
 
     loop {
@@ -36,6 +41,12 @@ pub async fn run_scheduler(service: TaskService, mut rx: mpsc::Receiver<()>) {
         );
 
         tokio::select! {
+            // Cancellation signal received
+            _ = token.cancelled() => {
+                tracing::info!("Scheduler received cancellation signal. Exiting.");
+                break;
+            }
+            // Timer elapsed
             _ = tokio::time::sleep(sleep_duration) => {
                 if let Some(task) = next_task {
                     if task.trigger_at <= Utc::now() {
@@ -45,9 +56,11 @@ pub async fn run_scheduler(service: TaskService, mut rx: mpsc::Receiver<()>) {
                     }
                 }
             }
+            // New task notification received
             _ = rx.recv() => {
                 tracing::info!("Received new task notification.");
             }
         }
     }
+    tracing::info!("Scheduler exited cleanly!");
 }
