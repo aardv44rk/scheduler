@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr = format!("0.0.0.0:{}", config.server_port);
     let listener = TcpListener::bind(&addr).await?;
 
-    tracing::info!("API Server listening on on {}", addr);
+    tracing::info!("API Server listening on {}", addr);
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal(cancel_token))
