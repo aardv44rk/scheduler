@@ -62,6 +62,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_graceful_shutdown(shutdown_signal(cancel_token))
         .await?;
 
+    tracing::info!("Application shut down gracefully.");
+
     Ok(())
 }
 

@@ -45,7 +45,7 @@ impl TaskService {
             ));
         }
 
-        // 2. Map DTO to Domain Entity
+        // Map DTO to Domain Entity
         let payload = req.payload.unwrap_or(json!({}));
 
         let task = match task_type {
@@ -58,12 +58,11 @@ impl TaskService {
             ),
         };
 
-        // 3. Save to DB
+        // Save to DB
         let repo = TaskRepository::new(&self.db_pool);
         repo.create_task(&task).await?;
 
-        // 4. Notify Scheduler (Fire and forget)
-        // If the channel is full or receiver dropped, we log but don't fail the request
+        // Notify scheduler
         let _ = self.scheduler_tx.try_send(());
 
         Ok(task.id)
@@ -89,7 +88,7 @@ impl TaskService {
         let output = Json(&exec.output);
         let exec_status = exec.status;
 
-        sqlx::query(
+        let db_result = sqlx::query(
             r#"
             INSERT INTO executions (id, task_id, executed_at, output, status)
             VALUES (?1, ?2, ?3, ?4, ?5)
@@ -101,25 +100,35 @@ impl TaskService {
         .bind(output)
         .bind(exec_status)
         .execute(&mut *scheduler_tx)
-        .await?;
+        .await;
 
-        match task.task_type {
-            TaskType::Once => {
-                TaskRepository::delete_task_with_executor(&mut *scheduler_tx, task.id).await?;
-            }
-            TaskType::Interval => {
-                // extract to helper function
-                if let Some(seconds) = task.interval_seconds {
-                    let next_trigger = task.trigger_at + chrono::Duration::seconds(seconds);
-
-                    TaskRepository::update_trigger_with_executor(
-                        &mut *scheduler_tx,
-                        task.id,
-                        next_trigger,
-                    )
-                    .await?;
+        match db_result {
+            Ok(_) => match task.task_type {
+                TaskType::Once => {
+                    TaskRepository::delete_task_with_executor(&mut *scheduler_tx, task.id).await?;
                 }
+                TaskType::Interval => {
+                    // extract to helper function
+                    if let Some(seconds) = task.interval_seconds {
+                        let next_trigger = task.trigger_at + chrono::Duration::seconds(seconds);
+
+                        TaskRepository::update_trigger_with_executor(
+                            &mut *scheduler_tx,
+                            task.id,
+                            next_trigger,
+                        )
+                        .await?;
+                    }
+                }
+            },
+
+            Err(sqlx::Error::Database(e)) if e.is_foreign_key_violation() => {
+                tracing::warn!("Task {} was deleted during execution.", task.id);
+                scheduler_tx.rollback().await?;
+                return Ok(());
             }
+
+            Err(e) => return Err(AppError::Database(e)),
         }
 
         scheduler_tx.commit().await?;
