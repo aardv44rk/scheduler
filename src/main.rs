@@ -1,7 +1,8 @@
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions};
 use std::str::FromStr;
 use std::time::Duration;
-use tokio::{net::TcpListener, sync::mpsc};
+use tokio::{net::TcpListener, signal, sync::mpsc};
+use tokio_util::sync::CancellationToken;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use task_scheduler::{api, config::Config, service::TaskService};
@@ -37,22 +38,56 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing::info!("Created scheduler channels.");
 
+    let cancel_token = CancellationToken::new();
+
     let service = TaskService::new(pool.clone(), scheduler_tx);
 
     let scheduler_service = service.clone();
+    let scheduler_token = cancel_token.clone();
 
     tokio::spawn(async move {
         tracing::info!("Scheduler background task started.");
-        task_scheduler::scheduler::run_scheduler(scheduler_service, scheduler_rx).await;
+        task_scheduler::scheduler::run_scheduler(scheduler_service, scheduler_rx, scheduler_token)
+            .await;
     });
     tracing::info!("Task service initialized.");
 
     let app = api::router(service);
-
     let addr = format!("0.0.0.0:{}", config.server_port);
-    tracing::info!("API Server listening on on {}", addr);
     let listener = TcpListener::bind(&addr).await?;
-    axum::serve(listener, app).await?;
+
+    tracing::info!("API Server listening on on {}", addr);
+
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal(cancel_token))
+        .await?;
 
     Ok(())
+}
+
+/// Listens for shutdown signals (Ctrl+C or termination) and triggers cancellation.
+async fn shutdown_signal(token: CancellationToken) {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("Failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("Failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    tracing::info!("Shutdown signal received.");
+    token.cancel();
 }
