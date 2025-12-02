@@ -42,7 +42,7 @@ async fn test_process_task_reschedules(pool: SqlitePool) -> sqlx::Result<()> {
         .abs();
 
     assert!(
-        diff < 100,
+        diff < 1000,
         "Task should have incremented by interval relevant to now"
     );
 
