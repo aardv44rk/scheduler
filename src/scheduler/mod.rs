@@ -5,6 +5,13 @@ use chrono::Utc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
+/// Runs the task scheduler which continuously checks for pending tasks and processes them.
+///
+/// # Arguments
+///
+/// * `service` - The TaskService used to process tasks.
+/// * `rx` - A receiver channel to listen for new task notifications.
+/// * `token` - A cancellation token to gracefully shut down the scheduler.
 pub async fn run_scheduler(
     service: TaskService,
     mut rx: mpsc::Receiver<()>,

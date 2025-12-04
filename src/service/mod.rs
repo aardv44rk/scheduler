@@ -28,6 +28,31 @@ impl TaskService {
         &self.db_pool
     }
 
+    pub async fn delete_task(&self, id: Uuid) -> Result<(), AppError> {
+        let repo = TaskRepository::new(&self.db_pool);
+
+        let rows_affected = repo.delete_task(id).await?;
+        if rows_affected == 0 {
+            return Err(AppError::NotFound);
+        }
+
+        Ok(())
+    }
+
+    /// Creates a new task based on the provided request data.
+    ///
+    /// # Arguments
+    ///
+    /// * `req` - A 'CreateTaskReq' containing task details.
+    ///
+    /// # Errors
+    ///
+    /// * Returns 'AppError::ValidationError' if:
+    /// * 'task_type' is invalid.
+    /// * 'Interval' task is missing 'interval_seconds'
+    /// * 'Interval' task has 'interval_seconds' less than 1.
+    ///
+    /// * Returns AppError::Database if insert fails.
     pub async fn create_task(&self, req: CreateTaskReq) -> Result<Uuid, AppError> {
         let task_type = match req.task_type.as_str() {
             "once" => TaskType::Once,
@@ -39,10 +64,21 @@ impl TaskService {
             }
         };
 
-        if task_type == TaskType::Interval && req.interval_seconds.is_none() {
-            return Err(AppError::ValidationError(
-                "Interval tasks require interval_seconds".into(),
-            ));
+        if task_type == TaskType::Interval {
+            match req.interval_seconds {
+                Some(seconds) if seconds < 1 => {
+                    // limit to at least 1 second to avoid loops
+                    return Err(AppError::ValidationError(
+                        "interval_seconds must be at least 1 second".into(),
+                    ));
+                }
+                None => {
+                    return Err(AppError::ValidationError(
+                        "interval_seconds is required for interval tasks".into(),
+                    ));
+                }
+                _ => {} // valid
+            }
         }
 
         // Map DTO to Domain Entity
@@ -68,15 +104,28 @@ impl TaskService {
         Ok(task.id)
     }
 
+    /// Processes a task: executes its logic, records execution, and updates/deletes the task as needed.
+    ///
+    /// # Arguments
+    ///
+    /// * `task` - The Task to be processed.
+    ///
+    /// # Errors
+    ///
+    /// * Returns 'AppError::Database' for any database operation failures.
+    ///
+    /// Returns 'Ok(())' even if the task was deleted during processing.
     pub async fn process_task(&self, task: Task) -> Result<(), AppError> {
-        tracing::info!("Processing task: {}", task.name);
+        tracing::info!(
+            task_id = %task.id,
+            name = %task.name,
+            "Processing Task"
+        );
 
-        let output = match self.execute_logic(&task).await {
-            Ok(val) => val,
-            Err(e) => json!({ "error": e.to_string() }),
+        let (output, status) = match self.execute_logic(&task).await {
+            Ok(val) => (val, ExecutionStatus::Success),
+            Err(e) => (json!({ "error": e.to_string() }), ExecutionStatus::Failure),
         };
-
-        let status = ExecutionStatus::Success;
 
         let mut scheduler_tx = self.db_pool.begin().await?;
 
@@ -104,9 +153,11 @@ impl TaskService {
 
         match db_result {
             Ok(_) => match task.task_type {
+                // For once tasks, delete after execution
                 TaskType::Once => {
                     TaskRepository::delete_task_with_executor(&mut *scheduler_tx, task.id).await?;
                 }
+                // For interval tasks, calculate and update next trigger time
                 TaskType::Interval => {
                     if let Some(seconds) = task.interval_seconds {
                         let next_trigger = chrono::Utc::now() + chrono::Duration::seconds(seconds);
@@ -120,7 +171,8 @@ impl TaskService {
                     }
                 }
             },
-
+            // Catch foreign key violation if task was deleted during processing here
+            //
             Err(sqlx::Error::Database(e)) if e.is_foreign_key_violation() => {
                 tracing::warn!("Task {} was deleted during execution.", task.id);
                 scheduler_tx.rollback().await?;
@@ -136,9 +188,54 @@ impl TaskService {
         Ok(())
     }
 
-    /// Dummy logic function
-    async fn execute_logic(&self, task: &Task) -> Result<serde_json::Value, String> {
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        Ok(json!({ "result": "Task executed successfully", "payload_echo": task.payload }))
+    /// Executes the HTTP webhook defined in the task payload.
+    ///
+    /// # Arguments
+    ///
+    /// * `task` - The Task containing the webhook details.
+    ///
+    /// # Errors
+    ///
+    /// * Returns an error string if the HTTP request fails or if required fields are missing.
+    ///
+    /// Returns the HTTP response as JSON on success.
+    async fn execute_webhook(&self, task: &Task) -> Result<serde_json::Value, String> {
+        let url = task
+            .payload
+            .get("url")
+            .and_then(|v| v.as_str())
+            .ok_or("Missing 'url' in payload")?;
+
+        let method = task
+            .payload
+            .get("method")
+            .and_then(|v| v.as_str())
+            .unwrap_or("GET");
+
+        let value = json!({});
+        let body = task.payload.get("body").unwrap_or(&value);
+
+        let client = reqwest::Client::new();
+
+        let builder = match method {
+            "POST" => client.post(url).json(body),
+            "PUT" => client.put(url).json(body),
+            "DELETE" => client.delete(url),
+            _ => client.get(url),
+        };
+
+        let response = builder
+            .send()
+            .await
+            .map_err(|e| format!("HTTP request failed: {}", e))?;
+
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+
+        if status.is_success() {
+            Ok(json!({ "status": status.as_u16(), "response": text }))
+        } else {
+            Err(format!("HTTP Error {}: {}", status.as_u16(), text))
+        }
     }
 }
