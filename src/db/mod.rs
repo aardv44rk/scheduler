@@ -8,6 +8,14 @@ pub mod queries;
 #[cfg(test)]
 mod tests;
 
+/// Initialize the SQLite connection pool with appropriate options.
+///
+/// # Arguments
+///
+/// * `database_url` - The database URL string.
+///
+/// # Returns
+/// * `Pool<Sqlite>` - The initialized SQLite connection pool.
 pub async fn init_pool(database_url: &str) -> Pool<Sqlite> {
     let mut options = SqliteConnectOptions::from_str(database_url)
         .expect("Invalid DATABASE_URL")
