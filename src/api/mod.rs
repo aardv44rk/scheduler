@@ -119,6 +119,15 @@ async fn delete_task(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Handler to list all tasks
+///
+/// # Arguments
+///
+/// * `State(state)` - Application state containing the TaskService
+///
+/// # Errors
+///
+/// * `AppError` - If the database query fails or data cannot be retrieved
 async fn list_tasks(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     let rows = sqlx::query("SELECT id,name,deleted_at FROM tasks")
         .fetch_all(state.service.get_pool())
