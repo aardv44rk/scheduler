@@ -118,6 +118,15 @@ async fn delete_task(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// Handler to list all tasks
+///
+/// # Arguments
+///
+/// * `State(state)` - Application state containing the TaskService
+///
+/// # Errors
+///
+/// * `AppError` - If listing tasks fails (see TaskService::list_tasks for details)
 async fn list_tasks(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<TaskSummaryResponse>>, AppError> {
