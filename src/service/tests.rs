@@ -88,3 +88,32 @@ async fn test_process_task_once_deletes(pool: SqlitePool) -> sqlx::Result<()> {
 
     Ok(())
 }
+
+#[sqlx::test]
+async fn test_interval_calculates_next_trigger_correctly(pool: SqlitePool) -> sqlx::Result<()> {
+    let repo = crate::db::queries::TaskRepository::new(&pool);
+    let service = setup_service(pool.clone());
+
+    let task = Task::new_interval("test", Utc::now(), 3600, json!({}));
+    repo.create_task(&task).await?;
+
+    service.process_task(task.clone()).await.unwrap();
+
+    let updated_task = repo.get_task(task.id).await?.unwrap();
+
+    let expected = Utc::now() + Duration::seconds(3600);
+    let diff = updated_task
+        .trigger_at
+        .signed_duration_since(expected)
+        .num_seconds()
+        .abs();
+
+    assert!(
+        diff < 5,
+        "Next trigger should be approximately one hour later! Got {}, expected {}",
+        updated_task.trigger_at,
+        expected
+    );
+
+    Ok(())
+}
