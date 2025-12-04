@@ -122,7 +122,7 @@ impl TaskService {
             "Processing Task"
         );
 
-        let (output, status) = match self.execute_logic(&task).await {
+        let (output, status) = match self.execute_webhook(&task).await {
             Ok(val) => (val, ExecutionStatus::Success),
             Err(e) => (json!({ "error": e.to_string() }), ExecutionStatus::Failure),
         };
