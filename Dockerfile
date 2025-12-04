@@ -1,5 +1,5 @@
 #   planner
-#   use Alpine to ensure link against MUSL libc
+#   using Alpine to ensure link against MUSL libc
 FROM rust:alpine AS planner
 WORKDIR /app
 
