@@ -238,4 +238,17 @@ impl TaskService {
             Err(format!("HTTP Error {}: {}", status.as_u16(), text))
         }
     }
+
+    /// Lists all tasks in the system.
+    ///
+    /// # Errors
+    ///
+    /// * Returns 'AppError::Database' for any database operation failures.
+    ///
+    /// Returns a vector of Tasks on success.
+    pub async fn list_tasks(&self) -> Result<Vec<Task>, AppError> {
+        let repo = TaskRepository::new(&self.db_pool);
+        let tasks = repo.get_all_tasks().await?;
+        Ok(tasks)
+    }
 }

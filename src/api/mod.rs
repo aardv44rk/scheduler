@@ -1,6 +1,6 @@
 pub mod dto;
 
-use crate::api::dto::CreateTaskReq;
+use crate::api::dto::{CreateTaskReq, TaskSummaryResponse};
 use crate::errors::AppError;
 use crate::service::TaskService;
 use axum::{
@@ -10,7 +10,6 @@ use axum::{
     routing::{delete, post},
 };
 use serde_json::{Value, json};
-use sqlx::Row;
 use tower_http::{
     request_id::{MakeRequestId, PropagateRequestIdLayer, RequestId, SetRequestIdLayer},
     trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
@@ -119,33 +118,24 @@ async fn delete_task(
     Ok(StatusCode::NO_CONTENT)
 }
 
-async fn list_tasks(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
-    let rows = sqlx::query("SELECT id,name,deleted_at FROM tasks")
-        .fetch_all(state.service.get_pool())
-        .await?;
+async fn list_tasks(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<TaskSummaryResponse>>, AppError> {
+    let tasks = state.service.list_tasks().await?;
 
-    let tasks: Vec<Value> = rows
-        .iter()
-        .map(|row| {
-            let id_res: Result<String, _> = row.try_get("id");
-
-            let id_display = match id_res {
-                Ok(id) => id,
-                Err(_) => {
-                    let uuid: Uuid = row.get("id");
-                    uuid.to_string()
-                }
-            };
-
-            let deleted: Option<String> = row.get("deleted_at");
-
-            json!({
-                "id": id_display,
-                "name": row.try_get::<String, _>("name").unwrap_or_default(),
-                "deleted_at": deleted,
-            })
+    let response: Vec<TaskSummaryResponse> = tasks
+        .into_iter()
+        .map(|task| TaskSummaryResponse {
+            id: task.id,
+            name: task.name,
+            status: if task.deleted_at.is_some() {
+                "deleted".to_string()
+            } else {
+                "active".to_string()
+            },
+            deleted_at: task.deleted_at,
         })
         .collect();
 
-    Ok(Json(json!(tasks)))
+    Ok(Json(response))
 }

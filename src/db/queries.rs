@@ -153,4 +153,16 @@ impl<'a> TaskRepository<'a> {
             deleted_at: row.try_get("deleted_at")?,
         }))
     }
+
+    pub async fn get_all_tasks(&self) -> sqlx::Result<Vec<Task>> {
+        sqlx::query_as::<_, Task>(
+            r#"
+            SELECT id, name, task_type, trigger_at, interval_seconds, payload, deleted_at
+            FROM tasks
+            ORDER BY created_at DESC
+            "#,
+        )
+        .fetch_all(self.pool)
+        .await
+    }
 }
