@@ -35,12 +35,13 @@ WORKDIR /app
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 #   add dependencies (root certs for https) and sqlite
-RUN apk add --no-cache ca-certificates sqlite-libs
+RUN apk add --no-cache ca-certificates sqlite-libs sqlite
 
 #   setup directory permissions
 RUN mkdir -p /app/data && chown -R appuser:appgroup /app/data
 
 #   copy artifacts
+COPY --from=builder /app/static /app/static
 COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/task-scheduler /app/task-scheduler
 COPY --from=builder /app/migrations /app/migrations
 
