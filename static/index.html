@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Scheduler</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/dayjs.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.10/plugin/relativeTime.min.js"></script>
+        <style>
+            @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap");
+            body {
+                font-family: "Inter", sans-serif;
+            }
+            .mono {
+                font-family: "JetBrains Mono", monospace;
+            }
+        </style>
+    </head>
+    <body class="bg-slate-900 text-slate-100 min-h-screen">
+        <!-- Navbar -->
+        <nav
+            class="border-b border-slate-800 bg-slate-900/50 backdrop-blur fixed w-full z-10 top-0"
+        >
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center gap-3">
+                        <div
+                            class="h-8 w-8 bg-indigo-500 rounded-lg flex items-center justify-center font-bold"
+                        >
+                            R
+                        </div>
+                        <span class="font-bold text-xl tracking-tight"
+                            >Scheduler</span
+                        >
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <main
+            class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12 grid grid-cols-1 lg:grid-cols-3 gap-8"
+        >
+            <!-- Left Col: Create Form -->
+            <div class="lg:col-span-1 space-y-6">
+                <div
+                    class="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-xl"
+                >
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                        <svg
+                            class="w-5 h-5 text-indigo-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M12 4v16m8-8H4"
+                            ></path>
+                        </svg>
+                        Schedule New Task
+                    </h2>
+
+                    <form id="createTaskForm" class="space-y-4">
+                        <!-- Name -->
+                        <div>
+                            <label
+                                class="block text-xs font-semibold text-slate-400 uppercase mb-1"
+                                >Task Name</label
+                            >
+                            <input
+                                type="text"
+                                id="taskName"
+                                required
+                                placeholder="e.g. Health Check"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+                            />
+                        </div>
+
+                        <!-- Type -->
+                        <div>
+                            <label
+                                class="block text-xs font-semibold text-slate-400 uppercase mb-1"
+                                >Task Type</label
+                            >
+                            <div class="grid grid-cols-2 gap-2">
+                                <button
+                                    type="button"
+                                    onclick="setType('once')"
+                                    id="btnOnce"
+                                    class="type-btn active bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium border border-transparent transition-all"
+                                >
+                                    Once
+                                </button>
+                                <button
+                                    type="button"
+                                    onclick="setType('interval')"
+                                    id="btnInterval"
+                                    class="type-btn bg-slate-900 text-slate-400 border-slate-700 hover:border-slate-500 py-2 rounded-lg text-sm font-medium border transition-all"
+                                >
+                                    Interval
+                                </button>
+                            </div>
+                            <input type="hidden" id="taskType" value="once" />
+                        </div>
+
+                        <!-- Timing -->
+                        <div id="timingSection">
+                            <label
+                                class="block text-xs font-semibold text-slate-400 uppercase mb-1"
+                                >Trigger Time (UTC)</label
+                            >
+                            <input
+                                type="datetime-local"
+                                id="triggerAt"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 focus:border-indigo-500 transition-colors"
+                            />
+                            <button
+                                type="button"
+                                onclick="setNow()"
+                                class="text-xs text-indigo-400 hover:text-indigo-300 mt-1 font-medium"
+                            >
+                                Set to Now + 5s
+                            </button>
+                        </div>
+
+                        <div id="intervalSection" class="hidden">
+                            <label
+                                class="block text-xs font-semibold text-slate-400 uppercase mb-1"
+                                >Interval (Seconds)</label
+                            >
+                            <input
+                                type="number"
+                                id="intervalSeconds"
+                                min="1"
+                                placeholder="e.g. 10"
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-indigo-500 transition-colors"
+                            />
+                        </div>
+
+                        <!-- Payload -->
+                        <div>
+                            <label
+                                class="block text-xs font-semibold text-slate-400 uppercase mb-1"
+                                >Webhook Payload</label
+                            >
+                            <div class="grid grid-cols-4 gap-2 mb-2">
+                                <select
+                                    id="httpMethod"
+                                    class="col-span-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-2 text-xs font-bold"
+                                >
+                                    <option value="GET">GET</option>
+                                    <option value="POST">POST</option>
+                                </select>
+                                <input
+                                    type="text"
+                                    id="targetUrl"
+                                    placeholder="https://api.example.com/hook"
+                                    class="col-span-3 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs focus:border-indigo-500"
+                                />
+                            </div>
+                            <textarea
+                                id="jsonBody"
+                                rows="3"
+                                placeholder='{"hello": "world"}'
+                                class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs mono focus:border-indigo-500"
+                            ></textarea>
+                        </div>
+
+                        <button
+                            type="submit"
+                            class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 rounded-lg shadow-lg shadow-indigo-900/20 transition-all transform active:scale-95"
+                        >
+                            Create Task
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right Col: Task List -->
+            <div class="lg:col-span-2 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-lg font-bold flex items-center gap-2">
+                        <svg
+                            class="w-5 h-5 text-indigo-400"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                            ></path>
+                        </svg>
+                        Task Queue
+                    </h2>
+                    <button
+                        onclick="fetchTasks()"
+                        class="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+                        title="Refresh"
+                    >
+                        <svg
+                            class="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                        >
+                            <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                            ></path>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Task List Container -->
+                <div id="taskList" class="space-y-3">
+                    <!-- Tasks will be injected here via JS -->
+                    <div class="text-center py-12 text-slate-500">
+                        Loading tasks...
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <script>
+            dayjs.extend(window.dayjs_plugin_relativeTime);
+
+            // --- State & Config ---
+            const API_BASE = "/tasks"; // Relative path since we serve from same origin
+
+            // --- Event Listeners ---
+            document
+                .getElementById("createTaskForm")
+                .addEventListener("submit", async (e) => {
+                    e.preventDefault();
+                    await createTask();
+                });
+
+            // --- UI Logic ---
+            function setType(type) {
+                document.getElementById("taskType").value = type;
+                const btnOnce = document.getElementById("btnOnce");
+                const btnInterval = document.getElementById("btnInterval");
+                const intervalSection =
+                    document.getElementById("intervalSection");
+
+                if (type === "once") {
+                    btnOnce.classList.add(
+                        "bg-indigo-600",
+                        "text-white",
+                        "border-transparent",
+                    );
+                    btnOnce.classList.remove(
+                        "bg-slate-900",
+                        "text-slate-400",
+                        "border-slate-700",
+                    );
+                    btnInterval.classList.remove(
+                        "bg-indigo-600",
+                        "text-white",
+                        "border-transparent",
+                    );
+                    btnInterval.classList.add(
+                        "bg-slate-900",
+                        "text-slate-400",
+                        "border-slate-700",
+                    );
+                    intervalSection.classList.add("hidden");
+                } else {
+                    btnInterval.classList.add(
+                        "bg-indigo-600",
+                        "text-white",
+                        "border-transparent",
+                    );
+                    btnInterval.classList.remove(
+                        "bg-slate-900",
+                        "text-slate-400",
+                        "border-slate-700",
+                    );
+                    btnOnce.classList.remove(
+                        "bg-indigo-600",
+                        "text-white",
+                        "border-transparent",
+                    );
+                    btnOnce.classList.add(
+                        "bg-slate-900",
+                        "text-slate-400",
+                        "border-slate-700",
+                    );
+                    intervalSection.classList.remove("hidden");
+                }
+            }
+
+            function setNow() {
+                // Set input to Now + 5 seconds (local time formatted for input)
+                const now = new Date(Date.now() + 5000);
+                now.setMinutes(now.getMinutes() - now.getTimezoneOffset()); // Adjust to local iso
+                document.getElementById("triggerAt").value = now
+                    .toISOString()
+                    .slice(0, 16);
+            }
+
+            // --- API Calls ---
+            async function fetchTasks() {
+                const listEl = document.getElementById("taskList");
+                try {
+                    const res = await fetch(API_BASE);
+                    const tasks = await res.json();
+
+                    if (tasks.length === 0) {
+                        listEl.innerHTML = `<div class="text-center py-12 text-slate-500 border-2 border-dashed border-slate-800 rounded-xl">No tasks found. Create one!</div>`;
+                        return;
+                    }
+
+                    listEl.innerHTML = tasks
+                        .map((task) => {
+                            const isDeleted = task.status === "deleted";
+                            const triggerDate = dayjs(
+                                task.trigger_at || task.deleted_at,
+                            ); // Fallback if schema varies
+                            const relativeTime = triggerDate.fromNow();
+
+                            return `
+                    <div class="bg-slate-800/50 hover:bg-slate-800 border ${isDeleted ? "border-slate-800 opacity-60" : "border-slate-700"} rounded-lg p-4 transition-all flex items-center justify-between group">
+                        <div class="flex items-start gap-4">
+                            <div class="mt-1 p-2 rounded-lg ${isDeleted ? "bg-slate-800 text-slate-500" : "bg-indigo-500/10 text-indigo-400"}">
+                                ${
+                                    isDeleted
+                                        ? '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>'
+                                        : '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>'
+                                }
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-slate-200 ${isDeleted ? "line-through" : ""}">${task.name}</h3>
+                                <div class="flex items-center gap-3 text-xs text-slate-400 mt-1">
+                                    <span class="mono bg-slate-900 px-1.5 py-0.5 rounded text-slate-500">${task.id.slice(0, 8)}...</span>
+                                    <span>${relativeTime}</span>
+                                    ${isDeleted ? '<span class="text-red-400 bg-red-400/10 px-2 py-0.5 rounded-full">Deleted</span>' : '<span class="text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-full">Active</span>'}
+                                </div>
+                            </div>
+                        </div>
+
+                        ${
+                            !isDeleted
+                                ? `
+                        <button onclick="deleteTask('${task.id}')" class="opacity-0 group-hover:opacity-100 p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all" title="Delete Task">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>`
+                                : ""
+                        }
+                    </div>
+                    `;
+                        })
+                        .join("");
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+
+            async function createTask() {
+                const name = document.getElementById("taskName").value;
+                const type = document.getElementById("taskType").value;
+                const triggerLocal = document.getElementById("triggerAt").value;
+                const interval =
+                    document.getElementById("intervalSeconds").value;
+                const url = document.getElementById("targetUrl").value;
+                const method = document.getElementById("httpMethod").value;
+                const bodyStr = document.getElementById("jsonBody").value;
+
+                // Simple validation
+                if (!triggerLocal && type === "once")
+                    return alert("Trigger time required");
+                if (!url) return alert("Target URL required");
+
+                let payload = { url, method };
+                try {
+                    if (bodyStr) payload.body = JSON.parse(bodyStr);
+                } catch (e) {
+                    return alert("Invalid JSON body");
+                }
+
+                const data = {
+                    name,
+                    task_type: type,
+                    trigger_at: new Date(triggerLocal).toISOString(),
+                    payload,
+                };
+
+                if (type === "interval") {
+                    data.interval_seconds = parseInt(interval);
+                }
+
+                const res = await fetch(API_BASE, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data),
+                });
+
+                if (res.ok) {
+                    document.getElementById("createTaskForm").reset();
+                    setType("once");
+                    fetchTasks(); // Refresh list
+                } else {
+                    alert("Failed to create task");
+                }
+            }
+
+            async function deleteTask(id) {
+                if (!confirm("Are you sure?")) return;
+                await fetch(`${API_BASE}/${id}`, { method: "DELETE" });
+                fetchTasks();
+            }
+
+            // --- Init ---
+            setType("once");
+            fetchTasks();
+            setInterval(fetchTasks, 3000); // Polling every 3s
+        </script>
+    </body>
+</html>

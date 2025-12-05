@@ -210,14 +210,19 @@ impl TaskService {
             .payload
             .get("method")
             .and_then(|v| v.as_str())
-            .unwrap_or("GET");
+            .unwrap_or("GET")
+            .to_uppercase();
 
         let value = json!({});
         let body = task.payload.get("body").unwrap_or(&value);
 
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .user_agent("TaskScheduler/1.0")
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .map_err(|e| format!("Failed to build HTTP client: {}", e))?;
 
-        let builder = match method {
+        let builder = match method.as_str() {
             "POST" => client.post(url).json(body),
             "PUT" => client.put(url).json(body),
             "DELETE" => client.delete(url),
@@ -227,7 +232,7 @@ impl TaskService {
         let response = builder
             .send()
             .await
-            .map_err(|e| format!("HTTP request failed: {}", e))?;
+            .map_err(|e| format!("HTTP request failed: {:?}", e))?;
 
         let status = response.status();
         let text = response.text().await.unwrap_or_default();

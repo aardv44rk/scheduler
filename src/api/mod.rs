@@ -10,6 +10,7 @@ use axum::{
     routing::{delete, post},
 };
 use serde_json::{Value, json};
+use tower_http::services::ServeDir;
 use tower_http::{
     request_id::{MakeRequestId, PropagateRequestIdLayer, RequestId, SetRequestIdLayer},
     trace::{DefaultOnRequest, DefaultOnResponse, TraceLayer},
@@ -52,6 +53,7 @@ pub fn router(service: TaskService) -> Router {
     let x_request_id = "x-request-id".parse::<axum::http::HeaderName>().unwrap();
 
     Router::new()
+        .fallback_service(ServeDir::new("static"))
         .route("/tasks", post(create_task).get(list_tasks))
         .route("/tasks/{id}", delete(delete_task))
         .with_state(state)
