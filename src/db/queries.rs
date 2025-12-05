@@ -13,6 +13,14 @@ impl<'a> TaskRepository<'a> {
         Self { pool }
     }
 
+    /// Creates a new task in the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `task` - A reference to the Task entity to be created.
+    ///
+    /// # Returns
+    /// * `sqlx::Result<()>` - Result indicating success or failure of the operation.
     pub async fn create_task(&self, task: &Task) -> sqlx::Result<()> {
         sqlx::query(
             r#"
@@ -32,6 +40,14 @@ impl<'a> TaskRepository<'a> {
         Ok(())
     }
 
+    /// Retrieves a task by its ID from the database.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The UUID of the task to retrieve.
+    ///
+    /// # Returns
+    /// * `sqlx::Result<Option<Task>>` - Result containing the Task if found, or None if not found.
     pub async fn get_task(&self, id: Uuid) -> sqlx::Result<Option<Task>> {
         let row = sqlx::query(
             r#"
@@ -63,10 +79,20 @@ impl<'a> TaskRepository<'a> {
         Self::delete_task_with_executor(self.pool, id).await
     }
 
+    /// Soft deletes a task by setting its deleted_at timestamp.
+    ///
+    /// # Arguments
+    ///
+    /// * `executor` - An executor that can execute the query (e.g., a connection or transaction).
+    /// * `id` - The UUID of the task to soft delete.
+    ///
+    /// # Returns
+    /// * `sqlx::Result<u64>` - Result containing the number of rows affected.
     pub async fn delete_task_with_executor<'c, E>(executor: E, id: Uuid) -> sqlx::Result<u64>
     where
         E: Executor<'c, Database = Sqlite>,
     {
+        tracing::info!("DEBUG: Running Soft Delete for Task {}", id);
         let result = sqlx::query("UPDATE tasks SET deleted_at = ? WHERE id = ?")
             .bind(Utc::now())
             .bind(id)
@@ -74,14 +100,6 @@ impl<'a> TaskRepository<'a> {
             .await?;
 
         Ok(result.rows_affected())
-    }
-
-    pub async fn update_trigger(
-        &self,
-        id: Uuid,
-        new_trigger_at: chrono::DateTime<Utc>,
-    ) -> sqlx::Result<u64> {
-        Self::update_trigger_with_executor(self.pool, id, new_trigger_at).await
     }
 
     pub async fn update_trigger_with_executor<'c, E>(
@@ -134,5 +152,17 @@ impl<'a> TaskRepository<'a> {
             payload: row.try_get::<Json<Value>, _>("payload")?.0,
             deleted_at: row.try_get("deleted_at")?,
         }))
+    }
+
+    pub async fn get_all_tasks(&self) -> sqlx::Result<Vec<Task>> {
+        sqlx::query_as::<_, Task>(
+            r#"
+            SELECT id, name, task_type, trigger_at, interval_seconds, payload, deleted_at
+            FROM tasks
+            ORDER BY created_at DESC
+            "#,
+        )
+        .fetch_all(self.pool)
+        .await
     }
 }

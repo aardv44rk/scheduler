@@ -68,3 +68,31 @@ async fn test_create_task_validation_error(pool: SqlitePool) -> sqlx::Result<()>
 
     Ok(())
 }
+
+#[sqlx::test]
+async fn test_create_task_rejects_bad_interval(pool: SqlitePool) -> sqlx::Result<()> {
+    let (tx, _rx) = mpsc::channel(1);
+    let service = TaskService::new(pool.clone(), tx);
+    let app = router(service);
+
+    // create request
+    let payload = json!({
+        "name": "invalid_task",
+        "task_type": "interval",
+        "trigger_at": chrono::Utc::now().to_rfc3339(),
+        "interval_seconds": 0 // invalid, must be at least 1
+    });
+
+    let req = Request::builder()
+        .method("POST")
+        .uri("/tasks")
+        .header("Content-Type", "application/json")
+        .body(Body::from(payload.to_string()))
+        .unwrap();
+
+    let response = ServiceExt::oneshot(app, req).await.unwrap();
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    Ok(())
+}
