@@ -13,8 +13,7 @@ impl Config {
     pub fn from_env() -> Result<Self, AppError> {
         dotenv().ok();
 
-        let db_url = env::var("DATABASE_URL")
-            .map_err(|_| AppError::Config("DATABASE_URL must be set".to_string()))?;
+        let db_url = env::var("DATABASE_URL").unwrap_or("sqlite:./scheduler.db".to_string());
 
         let server_port = match env::var("SERVER_PORT") {
             Ok(port_str) => port_str.parse::<u16>().map_err(|_| {

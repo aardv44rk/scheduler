@@ -11,6 +11,8 @@ services:
       - DATABASE_URL=sqlite:///app/data/tasks.db
       - SERVER_PORT=8080
     volumes:
-      - ./data:/app/data
+      - data:/app/data
     dns:
       - 8.8.8.8
+volumes:
+  data:
